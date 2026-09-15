@@ -5,16 +5,13 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 
 from cleaning import get_or_create_current_cleaning
+from config import ADMIN_IDS, TELEGRAM_BOT_TOKEN
 from database import get_member, add_member, initialize_database, get_all_members, get_participants, add_participation, \
     is_participating, get_open_cleaning, complete_cleaning, get_cleaning_statistics
 
-ADMIN_IDS = {
-    502322401
-}
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
-
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -260,7 +257,7 @@ def main():
     initialize_database()
     application = (
         Application.builder()
-           .token("8922753710:AAHXnDtc2-aqwDuSpAlNJTvlILL8ikj-qWo")
+           .token(TELEGRAM_BOT_TOKEN)
            .build()
     )
     application.job_queue.run_daily(cleaning_reminder, time=time(hour=9, minute=0, tzinfo=ZoneInfo("Europe/Berlin")))
