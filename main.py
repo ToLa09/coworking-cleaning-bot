@@ -1,8 +1,11 @@
+from datetime import date
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 
 from cleaning import get_or_create_current_cleaning
-from database import get_member, add_member, initialize_database, get_all_members, get_participants, add_participation
+from database import get_member, add_member, initialize_database, get_all_members, get_participants, add_participation, \
+    is_participating, get_open_cleaning, complete_cleaning
 
 ADMIN_IDS = {
     502322401
@@ -92,7 +95,64 @@ async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             text += "Noch niemand.\n"
 
-        await query.message.reply_text(text)
+        user = update.effective_user
+        member = get_member(user.id)
+        keyboard = []
+        if is_participating(cleaning["id"], member["id"]):
+            keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        "🧹 Reinigung abschließen",
+                        callback_data="complete_cleaning",
+                    )
+                ]
+            )
+        reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+
+        await query.message.reply_text(
+            text,
+            reply_markup=reply_markup,
+        )
+
+    elif query.data == "complete_cleaning":
+        user = update.effective_user
+        member = get_member(user.id)
+        if not member:
+            await query.message.reply_text(
+                "Du bist nicht als Mitglied registriert."
+            )
+            return
+        cleaning = get_open_cleaning()
+        if not cleaning:
+            await query.message.reply_text(
+                "Es gibt aktuell keine offene Reinigung."
+            )
+            return
+        if not is_participating(
+                cleaning["id"],
+                member["id"],
+        ):
+            await query.message.reply_text(
+                "⛔ Du bist für diese Reinigung nicht registriert."
+            )
+            return
+        if date.fromisoformat(cleaning["start_date"]) > date.today():
+            await query.message.reply_text(
+                "Die Reinigung kann nicht abgeschlossen werden weil sie in der Zukunft liegt."
+            )
+            return
+        new_cleaning_id = complete_cleaning(
+            cleaning["id"]
+        )
+        if new_cleaning_id is None:
+            await query.message.reply_text(
+                "Die Reinigung konnte nicht abgeschlossen werden."
+            )
+            return
+        await query.message.reply_text(
+            "✅ Reinigung abgeschlossen!\n\n"
+            "🧹 Die nächste Reinigung wurde automatisch erstellt."
+        )
 
 async def members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user

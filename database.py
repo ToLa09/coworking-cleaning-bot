@@ -1,5 +1,8 @@
 import sqlite3
+from datetime import date, timedelta
 from pathlib import Path
+
+from config import CLEANING_INTERVAL_WEEKS
 
 DATABASE = Path("data/bot.sqlite")
 
@@ -134,6 +137,53 @@ def get_cleaning(cleaning_id: int):
             (cleaning_id,),
         ).fetchone()
 
+def complete_cleaning(cleaning_id: int):
+    with get_connection() as connection:
+        cleaning = connection.execute(
+            """
+            SELECT *
+            FROM cleanings
+            WHERE id = ?
+            """,
+            (cleaning_id,),
+        ).fetchone()
+        if not cleaning:
+            return None
+        if cleaning["status"] != "OPEN":
+            return None
+
+        connection.execute(
+            """
+            UPDATE cleanings
+            SET status = 'COMPLETED'
+            WHERE id = ?
+            """,
+            (cleaning_id,),
+        )
+        start_date = date.fromisoformat(cleaning["start_date"])
+        end_date = date.fromisoformat(cleaning["end_date"])
+
+        new_start_date = start_date + timedelta(
+            weeks=CLEANING_INTERVAL_WEEKS
+        )
+        new_end_date = end_date + timedelta(
+            weeks=CLEANING_INTERVAL_WEEKS
+        )
+        cursor = connection.execute(
+            """
+            INSERT INTO cleanings (
+                start_date,
+                end_date
+            )
+            VALUES (?, ?)
+            """,
+            (
+                new_start_date.isoformat(),
+                new_end_date.isoformat(),
+            ),
+        )
+        return cursor.lastrowid
+
 def add_participation(cleaning_id: int, member_id: int):
     with get_connection() as connection:
         connection.execute(
@@ -160,6 +210,19 @@ def get_participants(cleaning_id: int):
             """,
             (cleaning_id,),
         ).fetchall()
+
+def is_participating(cleaning_id: int, member_id: int):
+    with get_connection() as connection:
+        participation = connection.execute(
+            """
+            SELECT 1
+            FROM participations
+            WHERE cleaning_id = ?
+              AND member_id = ?
+            """,
+            (cleaning_id, member_id),
+        ).fetchone()
+        return participation is not None
 
 if __name__ == "__main__":
     initialize_database()
