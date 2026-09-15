@@ -96,3 +96,82 @@ def get_all_members():
             ORDER BY first_name
             """
         ).fetchall()
+
+def get_open_cleaning():
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM cleanings
+            WHERE status = 'OPEN'
+            ORDER BY start_date DESC
+            LIMIT 1
+            """
+        ).fetchone()
+
+def create_cleaning(start_date: str, end_date: str):
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO cleanings (
+                start_date,
+                end_date
+            )
+            VALUES (?, ?)
+            """,
+            (start_date, end_date),
+        )
+        return cursor.lastrowid
+
+def get_cleaning(cleaning_id: int):
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM cleanings
+            WHERE id = ?
+            """,
+            (cleaning_id,),
+        ).fetchone()
+
+def add_participation(cleaning_id: int, member_id: int):
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO participations (
+                cleaning_id,
+                member_id
+            )
+            VALUES (?, ?)
+            """,
+            (cleaning_id, member_id),
+        )
+
+def get_participants(cleaning_id: int):
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT members.*
+            FROM members
+            JOIN participations
+                ON participations.member_id = members.id
+            WHERE participations.cleaning_id = ?
+            ORDER BY participations.created_at
+            """,
+            (cleaning_id,),
+        ).fetchall()
+
+if __name__ == "__main__":
+    initialize_database()
+
+    cleaning = get_open_cleaning()
+
+    if cleaning is None:
+        cleaning_id = create_cleaning(
+            "2026-09-14",
+            "2026-09-20",
+        )
+    else:
+        cleaning_id = cleaning["id"]
+
+    print("Reinigung:", cleaning_id)

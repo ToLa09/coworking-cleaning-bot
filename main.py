@@ -1,7 +1,8 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 
-from database import get_member, add_member, initialize_database, get_all_members
+from cleaning import get_or_create_current_cleaning
+from database import get_member, add_member, initialize_database, get_all_members, get_participants
 
 ADMIN_IDS = {
     502322401
@@ -64,10 +65,21 @@ async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif query.data == "current_cleaning":
-        await query.message.reply_text(
-            f"📅 Hallo {user.first_name}, "
-            "hier zeigen wir später die aktuelle Reinigung."
+        cleaning = get_or_create_current_cleaning()
+        participants = get_participants(cleaning["id"])
+        text = (
+            "🧹 Aktuelle Reinigung\n\n"
+            f"{cleaning['start_date']} – "
+            f"{cleaning['end_date']}\n\n"
+            "👥 Teilnehmer:\n"
         )
+        if participants:
+            for member in participants:
+                text += f"• {member['first_name']}\n"
+        else:
+            text += "Noch niemand.\n"
+
+        await query.message.reply_text(text)
 
 async def members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
