@@ -3,6 +3,8 @@ from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQuer
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
     keyboard = [
         [
             InlineKeyboardButton(
@@ -21,23 +23,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "🧹 Coworking Reinigung\n\n"
-        "Was möchtest du tun?",
+        f"Hallo {user.first_name}! 👋\n\n"
+        f"Deine Telegram-ID ist: {user.id}\n\n"
+        "🧹 Was möchtest du tun?",
         reply_markup=reply_markup,
     )
 
 async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    user = query.from_user
 
     if query.data == "take_cleaning":
         await query.message.reply_text(
-            "🙋 Du möchtest die Reinigung übernehmen."
+            f"🙋 {user.first_name} möchte die Reinigung übernehmen."
         )
 
     elif query.data == "current_cleaning":
         await query.message.reply_text(
-            "📅 Hier zeigen wir später die aktuelle Reinigung."
+            f"📅 Hallo {user.first_name}, "
+            "hier zeigen wir später die aktuelle Reinigung."
         )
 
 def main():
