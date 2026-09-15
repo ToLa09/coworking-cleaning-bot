@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 
 from cleaning import get_or_create_current_cleaning
-from database import get_member, add_member, initialize_database, get_all_members, get_participants
+from database import get_member, add_member, initialize_database, get_all_members, get_participants, add_participation
 
 ADMIN_IDS = {
     502322401
@@ -60,8 +60,21 @@ async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = query.from_user
 
     if query.data == "take_cleaning":
+        user = update.effective_user
+        member = get_member(user.id)
+        if not member:
+            await query.message.reply_text(
+                "Fehler: Du bist noch nicht als Mitglied registriert"
+            )
+            return
+
+        cleaning = get_or_create_current_cleaning()
+        add_participation(
+            cleaning["id"],
+            member["id"],
+        )
         await query.message.reply_text(
-            f"🙋 {user.first_name} möchte die Reinigung übernehmen."
+            "🧹 Du bist bei der aktuellen Reinigung dabei! 👍"
         )
 
     elif query.data == "current_cleaning":
