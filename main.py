@@ -1,11 +1,12 @@
-from datetime import date
+from datetime import date, time
+from zoneinfo import ZoneInfo
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 
 from cleaning import get_or_create_current_cleaning
 from database import get_member, add_member, initialize_database, get_all_members, get_participants, add_participation, \
-    is_participating, get_open_cleaning, complete_cleaning
+    is_participating, get_open_cleaning, complete_cleaning, get_cleaning_statistics
 
 ADMIN_IDS = {
     502322401
@@ -179,6 +180,81 @@ async def members(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+async def statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    rows = get_cleaning_statistics()
+    if not rows:
+        await update.message.reply_text(
+            "Noch keine Reinigungen vorhanden."
+        )
+        return
+
+    text = "📊 Reinigungsstatistik\n\n"
+    current_cleaning_id = None
+
+    for row in rows:
+        if row["id"] != current_cleaning_id:
+            current_cleaning_id = row["id"]
+            text += (
+                f"🧹 {row['start_date']} – "
+                f"{row['end_date']}\n"
+            )
+            if row["status"] == "COMPLETED":
+                text += "   ✅ abgeschlossen\n"
+            else:
+                text += "   🟢 offen\n"
+
+            text += "   Teilnehmer:"
+        if row["first_name"]:
+            text += f" {row['first_name']}"
+        text += "\n"
+
+    await update.message.reply_text(text)
+
+async def cleaning_reminder(context: ContextTypes.DEFAULT_TYPE):
+    cleaning = get_open_cleaning()
+    if not cleaning:
+        return
+    today = date.today()
+    end_date = date.fromisoformat(cleaning["end_date"])
+    days_until_end = (end_date - today).days
+
+    if days_until_end == 1:
+        message = (
+            "🧹 Erinnerung\n\n"
+            "Die aktuelle Reinigung endet morgen."
+            "Bitte denkt daran, sie noch zu erledigen."
+        )
+    elif days_until_end == 0:
+        message = (
+            "🧹 Erinnerung\n\n"
+            "Heute ist der letzte Tag der aktuellen Reinigung. "
+            "Bitte denkt daran, sie heute abzuschließen."
+        )
+    elif days_until_end < 0:
+        message = (
+            "⚠️ Reinigung überfällig\n\n"
+            f"Die aktuelle Reinigung ist seit "
+            f"{abs(days_until_end)} Tagen überfällig.\n"
+            "Bitte holt sie möglichst bald nach."
+        )
+    else:
+        return
+
+    participants = get_participants(cleaning["id"])
+    if not participants:
+        return
+    for member in participants:
+        try:
+            await context.bot.send_message(
+                chat_id=member["telegram_id"],
+                text=message,
+            )
+        except Exception as error:
+            print(
+                f"Reminder konnte nicht an "
+                f"{member['telegram_id']} gesendet werden: {error}"
+            )
+
 
 def main():
     initialize_database()
@@ -187,8 +263,10 @@ def main():
            .token("8922753710:AAHXnDtc2-aqwDuSpAlNJTvlILL8ikj-qWo")
            .build()
     )
+    application.job_queue.run_daily(cleaning_reminder, time=time(hour=9, minute=0, tzinfo=ZoneInfo("Europe/Berlin")))
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('members', members))
+    application.add_handler(CommandHandler('stats', statistics))
     application.add_handler(CallbackQueryHandler(button_pressed))
     application.run_polling()
 

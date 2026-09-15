@@ -184,6 +184,26 @@ def complete_cleaning(cleaning_id: int):
         )
         return cursor.lastrowid
 
+def get_cleaning_statistics():
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT
+                cleanings.id,
+                cleanings.start_date,
+                cleanings.end_date,
+                cleanings.status,
+                members.first_name,
+                members.last_name
+            FROM cleanings
+            LEFT JOIN participations
+                ON participations.cleaning_id = cleanings.id
+            LEFT JOIN members
+                ON members.id = participations.member_id
+            ORDER BY cleanings.start_date DESC
+            """
+        ).fetchall()
+
 def add_participation(cleaning_id: int, member_id: int):
     with get_connection() as connection:
         connection.execute(
@@ -223,18 +243,3 @@ def is_participating(cleaning_id: int, member_id: int):
             (cleaning_id, member_id),
         ).fetchone()
         return participation is not None
-
-if __name__ == "__main__":
-    initialize_database()
-
-    cleaning = get_open_cleaning()
-
-    if cleaning is None:
-        cleaning_id = create_cleaning(
-            "2026-09-14",
-            "2026-09-20",
-        )
-    else:
-        cleaning_id = cleaning["id"]
-
-    print("Reinigung:", cleaning_id)
