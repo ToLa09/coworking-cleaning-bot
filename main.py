@@ -7,7 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, CallbackContext, \
     ConversationHandler, MessageHandler, filters
 
-from cleaning import get_or_create_current_cleaning, shift_cleaning
+from cleaning import get_or_create_current_cleaning, shift_cleaning, build_cleaning_message, build_cleaning_keyboard
 from config import ADMIN_IDS, TELEGRAM_BOT_TOKEN, GROUP_CHAT_ID, SHIFT_CLEANING
 from database import get_member, add_member, initialize_database, get_all_members, get_participants, add_participation, \
     is_participating, get_open_cleaning, complete_cleaning, get_cleaning_statistics, revoke_cleaning_participation, \
@@ -28,61 +28,15 @@ async def clean(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_name=user.last_name,
             username=user.username,
         )
+        member = get_member(user.id)
+
     cleaning = get_or_create_current_cleaning()
-    participants = get_participants(cleaning["id"])
-    text = (
-        f"Hallo {user.first_name}!\n\n"
-    )
-    if date.fromisoformat(cleaning['start_date']) > date.today():
-        text += (
-            "🧹 Nächste Reinigung\n\n"
-        )
-    else:
-        text += (
-            "🧹 Aktuelle Reinigung\n\n"
-        )
 
-    text += (
-        f"{cleaning['start_date']} – "
-        f"{cleaning['end_date']}\n\n"
-        "👥 Teilnehmer:\n"
+    text = build_cleaning_message(cleaning)
+    reply_markup = build_cleaning_keyboard(
+        cleaning,
+        member["id"],
     )
-    if participants:
-        for member in participants:
-            text += f"• {member['first_name']}\n"
-    else:
-        text += "Noch niemand.\n"
-
-    user = update.effective_user
-    member = get_member(user.id)
-    keyboard = []
-    if is_participating(cleaning["id"], member["id"]):
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    "🧹 Reinigung abschließen",
-                    callback_data="complete_cleaning",
-                )
-            ]
-        )
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    "Doch nicht mithelfen",
-                    callback_data="revoke_participation",
-                )
-            ]
-        )
-    else:
-        keyboard.append(
-        [
-            InlineKeyboardButton(
-                "🙋 Reinigung übernehmen",
-                callback_data="take_cleaning"
-            )
-        ],
-        )
-    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
 
     await update.message.reply_text(
         text,
@@ -244,70 +198,81 @@ async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = query.from_user
 
     if query.data == "take_cleaning":
-        user = update.effective_user
         member = get_member(user.id)
         if not member:
-            await query.message.reply_text(
-                "Fehler: Du bist noch nicht als Mitglied registriert"
+            add_member(
+                telegram_id=user.id,
+                first_name=user.first_name,
+                last_name=user.last_name,
+                username=user.username,
             )
-            return
-
+            member = get_member(user.id)
         cleaning = get_or_create_current_cleaning()
         add_participation(
             cleaning["id"],
             member["id"],
         )
-        await query.message.reply_text(
-            "🧹 Du bist bei der aktuellen Reinigung dabei! 👍"
+        text = build_cleaning_message(cleaning)
+        reply_markup = build_cleaning_keyboard(
+            cleaning,
+            member["id"],
+        )
+        await query.edit_message_text(
+            text,
+            reply_markup=reply_markup,
         )
 
     elif query.data == "complete_cleaning":
-        user = update.effective_user
         member = get_member(user.id)
         if not member:
-            await query.message.reply_text(
-                "Du bist nicht als Mitglied registriert."
+            add_member(
+                telegram_id=user.id,
+                first_name=user.first_name,
+                last_name=user.last_name,
+                username=user.username,
             )
-            return
+            member = get_member(user.id)
         cleaning = get_open_cleaning()
         if not cleaning:
-            await query.message.reply_text(
-                "Es gibt aktuell keine offene Reinigung."
-            )
+            await context.bot.send_message(chat_id=member["telegram_id"], text="Es gibt aktuell keine offene Reinigung.")
             return
         if not is_participating(
                 cleaning["id"],
                 member["id"],
         ):
-            await query.message.reply_text(
-                "⛔ Du bist für diese Reinigung nicht registriert."
-            )
+            await context.bot.send_message(chat_id=member["telegram_id"], text="⛔ Du bist für diese Reinigung nicht registriert.")
             return
         if date.fromisoformat(cleaning["start_date"]) > date.today():
-            await query.message.reply_text(
-                "Die Reinigung kann nicht abgeschlossen werden weil sie in der Zukunft liegt."
-            )
+            await context.bot.send_message(chat_id=member["telegram_id"], text="Die Reinigung kann nicht abgeschlossen werden weil sie in der Zukunft liegt.")
             return
         new_cleaning_id = complete_cleaning(
             cleaning["id"]
         )
         if new_cleaning_id is None:
-            await query.message.reply_text(
-                "Die Reinigung konnte nicht abgeschlossen werden."
-            )
+            await context.bot.send_message(chat_id=member["telegram_id"], text="Die Reinigung konnte nicht abgeschlossen werden.")
             return
-        await query.message.reply_text(
+        participants = get_participants(cleaning["id"])
+        text = (
             "✅ Reinigung abgeschlossen!\n\n"
-            "🧹 Die nächste Reinigung wurde automatisch erstellt."
+            "Teilnehmer:\n"
         )
+        for participant in participants:
+            text += f"• {participant['first_name']}\n"
+        text += "\n🧹 Die nächste Reinigung wurde automatisch erstellt."
+        await query.edit_message_text(text)
 
     elif query.data == "revoke_participation":
-        user = update.effective_user
         member = get_member(user.id)
         cleaning = get_open_cleaning()
         revoke_cleaning_participation(cleaning["id"],member["id"])
-        await query.message.reply_text(
-            "Du nimmst nicht mehr an der Reinigung teil."
+        text = build_cleaning_message(cleaning)
+        reply_markup = build_cleaning_keyboard(
+            cleaning,
+            member["id"],
+        )
+        await query.edit_message_text(
+            text,
+            reply_markup=reply_markup,
         )
 
 def main():
