@@ -15,25 +15,6 @@ from reminder import cleaning_reminder
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
-async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    member = get_member(user.id)
-
-    if member is None:
-        add_member(
-            telegram_id=user.id,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            username=user.username,
-        )
-        message = (
-            f"Hallo {user.first_name}! 👋\n\n"
-            "Du bist jetzt registriert."
-        )
-    else:
-        message = f"Hallo {user.first_name}, du bist bereits registriert."
-    await update.message.reply_text(message)
-
 async def clean(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     member = get_member(user.id)
@@ -240,7 +221,6 @@ def main():
            .build()
     )
     application.job_queue.run_daily(cleaning_reminder, time=time(hour=21, minute=38, tzinfo=ZoneInfo("Europe/Berlin")))
-    application.add_handler(CommandHandler('register', register))
     application.add_handler(CommandHandler('clean', clean))
     application.add_handler(CommandHandler('members', members))
     application.add_handler(CommandHandler('stats', statistics))
