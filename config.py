@@ -6,3 +6,4 @@ ADMIN_IDS = {
     for user_id in os.environ["ADMIN_IDS"].split(",")
 }
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+GROUP_CHAT_ID = int(os.environ["GROUP_CHAT_ID"])

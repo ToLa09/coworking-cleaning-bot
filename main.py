@@ -1,3 +1,4 @@
+from concurrent.interpreters import get_current
 from datetime import date, time
 from zoneinfo import ZoneInfo
 
@@ -5,9 +6,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, CallbackContext
 
 from cleaning import get_or_create_current_cleaning
-from config import ADMIN_IDS, TELEGRAM_BOT_TOKEN
+from config import ADMIN_IDS, TELEGRAM_BOT_TOKEN, GROUP_CHAT_ID
 from database import get_member, add_member, initialize_database, get_all_members, get_participants, add_participation, \
     is_participating, get_open_cleaning, complete_cleaning, get_cleaning_statistics, revoke_cleaning_participation
+from reminder import cleaning_reminder
 
 
 def is_admin(user_id: int) -> bool:
@@ -46,7 +48,17 @@ async def clean(update: Update, context: ContextTypes.DEFAULT_TYPE):
     participants = get_participants(cleaning["id"])
     text = (
         f"Hallo {user.first_name}!\n\n"
-        "🧹 Aktuelle Reinigung\n\n"
+    )
+    if date.fromisoformat(cleaning['start_date']) > date.today():
+        text += (
+            "🧹 Nächste Reinigung\n\n"
+        )
+    else:
+        text += (
+            "🧹 Aktuelle Reinigung\n\n"
+        )
+
+    text += (
         f"{cleaning['start_date']} – "
         f"{cleaning['end_date']}\n\n"
         "👥 Teilnehmer:\n"
@@ -92,6 +104,61 @@ async def clean(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text,
         reply_markup=reply_markup,
     )
+
+async def members(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not is_admin(user.id):
+        await update.message.reply_text(
+            "⛔ Dieser Befehl ist nur für Admins verfügbar."
+        )
+        return
+
+    members = get_all_members()
+
+    if not members:
+        await update.message.reply_text(
+            "Noch keine Mitglieder registriert."
+        )
+        return
+
+    text = "👥 Mitglieder\n\n"
+    for member in members:
+        text += f"• {member['first_name']}"
+        if member["last_name"]:
+            text += f" {member['last_name']}"
+        text += f" — ID: {member['telegram_id']}\n"
+
+    await update.message.reply_text(text)
+
+async def statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    rows = get_cleaning_statistics()
+    if not rows:
+        await update.message.reply_text(
+            "Noch keine Reinigungen vorhanden."
+        )
+        return
+
+    text = "📊 Reinigungsstatistik\n\n"
+    current_cleaning_id = None
+
+    for row in rows:
+        if row["id"] != current_cleaning_id:
+            current_cleaning_id = row["id"]
+            text += (
+                f"🧹 {row['start_date']} – "
+                f"{row['end_date']}\n"
+            )
+            if row["status"] == "COMPLETED":
+                text += "   ✅ abgeschlossen\n"
+            else:
+                text += "   🟢 offen\n"
+
+            text += "   Teilnehmer:"
+        if row["first_name"]:
+            text += f" {row['first_name']}"
+        text += "\n"
+
+    await update.message.reply_text(text)
 
 async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -165,107 +232,6 @@ async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Du nimmst nicht mehr an der Reinigung teil."
         )
 
-async def members(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not is_admin(user.id):
-        await update.message.reply_text(
-            "⛔ Dieser Befehl ist nur für Admins verfügbar."
-        )
-        return
-
-    members = get_all_members()
-
-    if not members:
-        await update.message.reply_text(
-            "Noch keine Mitglieder registriert."
-        )
-        return
-
-    text = "👥 Mitglieder\n\n"
-    for member in members:
-        text += f"• {member['first_name']}"
-        if member["last_name"]:
-            text += f" {member['last_name']}"
-        text += f" — ID: {member['telegram_id']}\n"
-
-    await update.message.reply_text(text)
-
-async def statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rows = get_cleaning_statistics()
-    if not rows:
-        await update.message.reply_text(
-            "Noch keine Reinigungen vorhanden."
-        )
-        return
-
-    text = "📊 Reinigungsstatistik\n\n"
-    current_cleaning_id = None
-
-    for row in rows:
-        if row["id"] != current_cleaning_id:
-            current_cleaning_id = row["id"]
-            text += (
-                f"🧹 {row['start_date']} – "
-                f"{row['end_date']}\n"
-            )
-            if row["status"] == "COMPLETED":
-                text += "   ✅ abgeschlossen\n"
-            else:
-                text += "   🟢 offen\n"
-
-            text += "   Teilnehmer:"
-        if row["first_name"]:
-            text += f" {row['first_name']}"
-        text += "\n"
-
-    await update.message.reply_text(text)
-
-async def cleaning_reminder(context: ContextTypes.DEFAULT_TYPE):
-    cleaning = get_open_cleaning()
-    if not cleaning:
-        return
-    today = date.today()
-    end_date = date.fromisoformat(cleaning["end_date"])
-    days_until_end = (end_date - today).days
-
-    if days_until_end == 1:
-        message = (
-            "🧹 Erinnerung\n\n"
-            "Die aktuelle Reinigung endet morgen."
-            "Bitte denkt daran, sie noch zu erledigen."
-        )
-    elif days_until_end == 0:
-        message = (
-            "🧹 Erinnerung\n\n"
-            "Heute ist der letzte Tag der aktuellen Reinigung. "
-            "Bitte denkt daran, sie heute abzuschließen."
-        )
-    elif days_until_end < 0:
-        message = (
-            "⚠️ Reinigung überfällig\n\n"
-            f"Die aktuelle Reinigung ist seit "
-            f"{abs(days_until_end)} Tagen überfällig.\n"
-            "Bitte holt sie möglichst bald nach."
-        )
-    else:
-        return
-
-    participants = get_participants(cleaning["id"])
-    if not participants:
-        return
-    for member in participants:
-        try:
-            await context.bot.send_message(
-                chat_id=member["telegram_id"],
-                text=message,
-            )
-        except Exception as error:
-            print(
-                f"Reminder konnte nicht an "
-                f"{member['telegram_id']} gesendet werden: {error}"
-            )
-
-
 def main():
     initialize_database()
     application = (
@@ -273,7 +239,7 @@ def main():
            .token(TELEGRAM_BOT_TOKEN)
            .build()
     )
-    application.job_queue.run_daily(cleaning_reminder, time=time(hour=9, minute=0, tzinfo=ZoneInfo("Europe/Berlin")))
+    application.job_queue.run_daily(cleaning_reminder, time=time(hour=21, minute=38, tzinfo=ZoneInfo("Europe/Berlin")))
     application.add_handler(CommandHandler('register', register))
     application.add_handler(CommandHandler('clean', clean))
     application.add_handler(CommandHandler('members', members))
