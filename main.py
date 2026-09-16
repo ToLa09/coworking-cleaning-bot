@@ -171,7 +171,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Sendet dir bei welchen Reinigungen du bisher mitgeholfen hast.\n\n"
 
         "ℹ️ HINWEIS\n"
-        "Wenn die Befehle in einer Gruppe aufgerufen werden, sind die Antworten für alle sichtbar."
+        "Wenn die Befehle in einer Gruppe aufgerufen werden, sind die Antworten für alle sichtbar.\n\n"
     )
 
     if is_admin(user.id):
