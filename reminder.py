@@ -65,10 +65,10 @@ async def cleaning_reminder(context: ContextTypes.DEFAULT_TYPE):
     else:
         return
 
-    # await context.bot.send_message(
-    #     chat_id=GROUP_CHAT_ID,
-    #     text=group_message,
-    # )
+    await context.bot.send_message(
+        chat_id=GROUP_CHAT_ID,
+        text=group_message,
+    )
 
     if not participants:
         return
