@@ -299,7 +299,7 @@ def main():
         },
         fallbacks=[]
     ))
-    application.job_queue.run_daily(cleaning_reminder, time=time(hour=21, minute=38, tzinfo=ZoneInfo("Europe/Berlin")))
+    application.job_queue.run_daily(cleaning_reminder, time=time(hour=9, minute=0, tzinfo=ZoneInfo("Europe/Berlin")))
     application.add_handler(CommandHandler('clean', clean))
     application.add_handler(CommandHandler('members', members))
     application.add_handler(CommandHandler('stats', statistics))
