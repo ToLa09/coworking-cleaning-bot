@@ -83,7 +83,7 @@ def build_cleaning_keyboard(cleaning, member_id):
     else:
         keyboard.append([
             InlineKeyboardButton(
-                "🙋 Reinigung übernehmen",
+                "🙋 Mithelfen",
                 callback_data="take_cleaning",
             )
         ])
