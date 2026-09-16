@@ -20,14 +20,12 @@ async def cleaning_reminder(context: ContextTypes.DEFAULT_TYPE):
     if today == start_date:
         if not participants:
             group_message = (
-                "🧹 Erinnerung\n\n"
-                "Diese Woche ist Reinigungswoche!\n"
-                "Es nimmt noch niemand teil. Klickt bitte unter /clean auf \"teilnehmen\" wenn ihr diese Woche bei der Büroreinigung mithelft."
+                "Juhu! Diese Woche ist Reinigungswoche.\n"
+                "Da noch niemand teilnimmt: Klickt bitte unter /clean auf \"teilnehmen\" wenn ihr diese Woche bei der Büroreinigung mithelft."
             )
         else:
             group_message = (
-                "🧹 Erinnerung\n\n"
-                "Diese Woche ist Reinigungswoche!\n"
+                "Juhu! Diese Woche ist Reinigungswoche.\n"
                 "Wer mithilft klickt bitte unter /clean auf \"teilnehmen\". Wenn ihr fertig seid bitte \"Reinigung abschließen\"."
                 "Aktuell nimmt teil:\n"
             )
