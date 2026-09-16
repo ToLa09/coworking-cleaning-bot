@@ -185,6 +185,56 @@ async def user_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message += f"   Teilnehmer: {participation['first_name']}\n"
     await update.message.reply_text(message)
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    text = (
+        "🧹 REINIGUNGS-BOT\n\n"
+        "Mit diesem Bot könnt ihr die wöchentliche Reinigung organisieren.\n\n"
+        
+        "/help\n"
+        "Zeigt diese Übersicht mit allen verfügbaren Befehlen.\n\n"
+
+        "/clean\n"
+        "Zeigt die aktuelle bzw. nächste Reinigung und die bisher "
+        "eingetragenen Teilnehmer.\n\n"
+
+        "Dort kannst du:\n"
+        "🙋 bei der Reinigung mithelfen\n"
+        "❌ deine Teilnahme wieder zurückziehen\n"
+        "✅ die Reinigung abschließen\n\n"
+        
+        "ℹ️ HINWEIS\n"
+        "Die nächste Reinigung wird automatisch erstellt, sobald "
+        "die aktuelle Reinigung abgeschlossen wurde.\n\n"
+
+        "📊 STATISTIK\n\n"
+
+        "/stats\n"
+        "Zeigt die Übersicht aller Reinigungen mit Status und Teilnehmern.\n\n"
+
+        "/mystats\n"
+        "Zeigt dir, bei welchen Reinigungen du bisher mitgeholfen hast.\n\n"
+    )
+
+    if is_admin(user.id):
+        text += (
+            "🔧 ADMIN-BEFEHLE\n\n"
+
+            "/members\n"
+            "Zeigt alle registrierten Mitglieder.\n\n"
+
+            "/shift\n"
+            "Verschiebt die aktuelle Reinigung um eine beliebige Anzahl "
+            "von Wochen.\n"
+            "Danach einfach eine Zahl eingeben:\n"
+            "• 2 = zwei Wochen nach hinten\n"
+            "• -1 = eine Woche nach vorne\n"
+            "• 0 = keine Verschiebung\n\n"
+        )
+
+    await update.message.reply_text(text)
+
 async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -286,6 +336,7 @@ def main():
     application.add_handler(CommandHandler('members', members))
     application.add_handler(CommandHandler('stats', statistics))
     application.add_handler(CommandHandler('mystats', user_statistics))
+    application.add_handler(CommandHandler('help', help_command))
     application.add_handler(CallbackQueryHandler(button_pressed))
     application.run_polling()
 
