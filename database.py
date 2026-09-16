@@ -184,6 +184,17 @@ def complete_cleaning(cleaning_id: int):
         )
         return cursor.lastrowid
 
+def update_cleaning_dates(cleaning_id: int, start_date: date, end_date: date):
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE cleanings
+            SET start_date = ?, end_date = ?
+            WHERE id = ?
+            """,
+            (start_date, end_date, cleaning_id),
+        )
+
 def get_cleaning_statistics():
     with get_connection() as connection:
         return connection.execute(

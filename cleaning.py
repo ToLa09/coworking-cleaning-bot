@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from database import get_open_cleaning, create_cleaning, get_cleaning
+from database import get_open_cleaning, create_cleaning, get_cleaning, update_cleaning_dates
 
 
 def get_current_week():
@@ -10,6 +10,7 @@ def get_current_week():
     end = start + timedelta(days=6)
 
     return start, end
+
 
 def get_or_create_current_cleaning():
     cleaning = get_open_cleaning()
@@ -25,3 +26,15 @@ def get_or_create_current_cleaning():
     )
 
     return get_cleaning(cleaning_id)
+
+
+def shift_cleaning(cleaning_id: int, weeks: int):
+    cleaning = get_cleaning(cleaning_id)
+    if not cleaning:
+        return
+    current_start = date.fromisoformat(cleaning['start_date'])
+    current_end = date.fromisoformat(cleaning['end_date'])
+    new_start = current_start + timedelta(weeks=weeks)
+    new_end = current_end + timedelta(weeks=weeks)
+    update_cleaning_dates(cleaning_id, new_start, new_end)
+    return

@@ -3,10 +3,11 @@ from datetime import date, time
 from zoneinfo import ZoneInfo
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, CallbackContext, \
+    ConversationHandler, MessageHandler, filters
 
-from cleaning import get_or_create_current_cleaning
-from config import ADMIN_IDS, TELEGRAM_BOT_TOKEN, GROUP_CHAT_ID
+from cleaning import get_or_create_current_cleaning, shift_cleaning
+from config import ADMIN_IDS, TELEGRAM_BOT_TOKEN, GROUP_CHAT_ID, SHIFT_CLEANING
 from database import get_member, add_member, initialize_database, get_all_members, get_participants, add_participation, \
     is_participating, get_open_cleaning, complete_cleaning, get_cleaning_statistics, revoke_cleaning_participation
 from reminder import cleaning_reminder
@@ -85,6 +86,23 @@ async def clean(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text,
         reply_markup=reply_markup,
     )
+
+async def shift_cleaning_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return ConversationHandler.END
+    message = "Um wie viele Wochen soll die Reinigung verschoben werden?\nBitte eine Zahl eingeben."
+    await update.message.reply_text(message)
+    return SHIFT_CLEANING
+
+
+async def shift_cleaning_value(update, context):
+    weeks = int(update.message.text)
+    cleaning = get_open_cleaning()
+    shift_cleaning(cleaning['id'], weeks)
+    await update.message.reply_text(
+        f"✅ Reinigung um {weeks} Wochen verschoben."
+    )
+    return ConversationHandler.END
 
 async def members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -220,6 +238,23 @@ def main():
            .token(TELEGRAM_BOT_TOKEN)
            .build()
     )
+    application.add_handler(ConversationHandler(
+        entry_points=[
+            CommandHandler(
+                'shift',
+                shift_cleaning_start
+            )
+        ],
+        states={
+            SHIFT_CLEANING: [
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND,
+                    shift_cleaning_value
+                )
+            ]
+        },
+        fallbacks=[]
+    ))
     application.job_queue.run_daily(cleaning_reminder, time=time(hour=21, minute=38, tzinfo=ZoneInfo("Europe/Berlin")))
     application.add_handler(CommandHandler('clean', clean))
     application.add_handler(CommandHandler('members', members))
@@ -228,8 +263,7 @@ def main():
     application.run_polling()
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     main()
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+
