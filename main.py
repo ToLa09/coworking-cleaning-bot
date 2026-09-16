@@ -183,7 +183,7 @@ async def user_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             message += "   ✅ abgeschlossen\n"
             message += f"   Teilnehmer: {participation['first_name']}\n"
-    await update.message.reply_text(message)
+    await context.bot.send_message(chat_id=member["telegram_id"], text=message)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -214,7 +214,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Zeigt die Übersicht aller Reinigungen mit Status und Teilnehmern.\n\n"
 
         "/mystats\n"
-        "Zeigt dir, bei welchen Reinigungen du bisher mitgeholfen hast.\n\n"
+        "Sendet dir bei welchen Reinigungen du bisher mitgeholfen hast.\n\n"
+
+        "ℹ️ HINWEIS\n"
+        "Wenn die Befehle in einer Gruppe aufgerufen werden, sind die Antworten für alle sichtbar."
     )
 
     if is_admin(user.id):
