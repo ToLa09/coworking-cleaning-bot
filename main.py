@@ -2,6 +2,7 @@ from concurrent.interpreters import get_current
 from datetime import date, time
 from zoneinfo import ZoneInfo
 
+from pyexpat.errors import messages
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, CallbackContext, \
     ConversationHandler, MessageHandler, filters
@@ -9,7 +10,8 @@ from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQuer
 from cleaning import get_or_create_current_cleaning, shift_cleaning
 from config import ADMIN_IDS, TELEGRAM_BOT_TOKEN, GROUP_CHAT_ID, SHIFT_CLEANING
 from database import get_member, add_member, initialize_database, get_all_members, get_participants, add_participation, \
-    is_participating, get_open_cleaning, complete_cleaning, get_cleaning_statistics, revoke_cleaning_participation
+    is_participating, get_open_cleaning, complete_cleaning, get_cleaning_statistics, revoke_cleaning_participation, \
+    get_user_participations
 from reminder import cleaning_reminder
 
 
@@ -159,6 +161,30 @@ async def statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+async def user_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    member = get_member(user.id)
+    if not member:
+        add_member(
+            telegram_id=user.id,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            username=user.username,
+        )
+    participations = get_user_participations(member['id'])
+    if not participations:
+        message = "Du hast bisher bei noch keiner Reinigung geholfen"
+    else:
+        message = f"Du hast bisher bei {len(participations)} Reinigungen mitgeholfen:\n"
+        for participation in participations:
+            message += (
+                f"🧹 {participation['start_date']} – "
+                f"{participation['end_date']}\n"
+            )
+            message += "   ✅ abgeschlossen\n"
+            message += f"   Teilnehmer: {participation['first_name']}\n"
+    await update.message.reply_text(message)
+
 async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -259,6 +285,7 @@ def main():
     application.add_handler(CommandHandler('clean', clean))
     application.add_handler(CommandHandler('members', members))
     application.add_handler(CommandHandler('stats', statistics))
+    application.add_handler(CommandHandler('mystats', user_statistics))
     application.add_handler(CallbackQueryHandler(button_pressed))
     application.run_polling()
 

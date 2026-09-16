@@ -264,3 +264,18 @@ def is_participating(cleaning_id: int, member_id: int):
             (cleaning_id, member_id),
         ).fetchone()
         return participation is not None
+
+def get_user_participations(member_id: int):
+    with get_connection() as connection:
+        return  connection.execute(
+            """
+            SELECT *
+            FROM cleanings
+            LEFT JOIN participations
+                ON participations.cleaning_id = cleanings.id
+            LEFT JOIN members
+                ON members.id = participations.member_id
+            WHERE member_id = ? AND status = "COMPLETED"
+            """,
+            (member_id,),
+        ).fetchall()
