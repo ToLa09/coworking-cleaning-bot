@@ -217,6 +217,16 @@ def add_participation(cleaning_id: int, member_id: int):
             (cleaning_id, member_id),
         )
 
+def revoke_cleaning_participation(cleaning_id: int, member_id: int):
+    with get_connection() as connection:
+        connection.execute(
+            """
+            DELETE FROM participations
+            WHERE cleaning_id = ? AND member_id = ?
+            """,
+            (cleaning_id, member_id),
+        )
+
 def get_participants(cleaning_id: int):
     with get_connection() as connection:
         return connection.execute(

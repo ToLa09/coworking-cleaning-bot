@@ -2,19 +2,18 @@ from datetime import date, time
 from zoneinfo import ZoneInfo
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, CallbackContext
 
 from cleaning import get_or_create_current_cleaning
 from config import ADMIN_IDS, TELEGRAM_BOT_TOKEN
 from database import get_member, add_member, initialize_database, get_all_members, get_participants, add_participation, \
-    is_participating, get_open_cleaning, complete_cleaning, get_cleaning_statistics
+    is_participating, get_open_cleaning, complete_cleaning, get_cleaning_statistics, revoke_cleaning_participation
 
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     member = get_member(user.id)
 
@@ -25,34 +24,73 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_name=user.last_name,
             username=user.username,
         )
-
         message = (
             f"Hallo {user.first_name}! 👋\n\n"
             "Du bist jetzt registriert."
         )
     else:
-        message = (
-            f"Schön dich wiederzusehen, {user.first_name}! 👋"
-        )
+        message = f"Hallo {user.first_name}, du bist bereits registriert."
+    await update.message.reply_text(message)
 
-    keyboard = [
+async def clean(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    member = get_member(user.id)
+    if member is None:
+        add_member(
+            telegram_id=user.id,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            username=user.username,
+        )
+    cleaning = get_or_create_current_cleaning()
+    participants = get_participants(cleaning["id"])
+    text = (
+        f"Hallo {user.first_name}!\n\n"
+        "🧹 Aktuelle Reinigung\n\n"
+        f"{cleaning['start_date']} – "
+        f"{cleaning['end_date']}\n\n"
+        "👥 Teilnehmer:\n"
+    )
+    if participants:
+        for member in participants:
+            text += f"• {member['first_name']}\n"
+    else:
+        text += "Noch niemand.\n"
+
+    user = update.effective_user
+    member = get_member(user.id)
+    keyboard = []
+    if is_participating(cleaning["id"], member["id"]):
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    "🧹 Reinigung abschließen",
+                    callback_data="complete_cleaning",
+                )
+            ]
+        )
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    "Doch nicht mithelfen",
+                    callback_data="revoke_participation",
+                )
+            ]
+        )
+    else:
+        keyboard.append(
         [
             InlineKeyboardButton(
                 "🙋 Reinigung übernehmen",
                 callback_data="take_cleaning"
             )
         ],
-        [
-            InlineKeyboardButton(
-                "📅 Aktuelle Reinigung",
-                callback_data="current_cleaning"
-            )
-        ],
-    ]
+        )
+    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
 
     await update.message.reply_text(
-        message,
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        text,
+        reply_markup=reply_markup,
     )
 
 async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -76,40 +114,6 @@ async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await query.message.reply_text(
             "🧹 Du bist bei der aktuellen Reinigung dabei! 👍"
-        )
-
-    elif query.data == "current_cleaning":
-        cleaning = get_or_create_current_cleaning()
-        participants = get_participants(cleaning["id"])
-        text = (
-            "🧹 Aktuelle Reinigung\n\n"
-            f"{cleaning['start_date']} – "
-            f"{cleaning['end_date']}\n\n"
-            "👥 Teilnehmer:\n"
-        )
-        if participants:
-            for member in participants:
-                text += f"• {member['first_name']}\n"
-        else:
-            text += "Noch niemand.\n"
-
-        user = update.effective_user
-        member = get_member(user.id)
-        keyboard = []
-        if is_participating(cleaning["id"], member["id"]):
-            keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        "🧹 Reinigung abschließen",
-                        callback_data="complete_cleaning",
-                    )
-                ]
-            )
-        reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
-
-        await query.message.reply_text(
-            text,
-            reply_markup=reply_markup,
         )
 
     elif query.data == "complete_cleaning":
@@ -150,6 +154,15 @@ async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(
             "✅ Reinigung abgeschlossen!\n\n"
             "🧹 Die nächste Reinigung wurde automatisch erstellt."
+        )
+
+    elif query.data == "revoke_participation":
+        user = update.effective_user
+        member = get_member(user.id)
+        cleaning = get_open_cleaning()
+        revoke_cleaning_participation(cleaning["id"],member["id"])
+        await query.message.reply_text(
+            "Du nimmst nicht mehr an der Reinigung teil."
         )
 
 async def members(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -261,7 +274,8 @@ def main():
            .build()
     )
     application.job_queue.run_daily(cleaning_reminder, time=time(hour=9, minute=0, tzinfo=ZoneInfo("Europe/Berlin")))
-    application.add_handler(CommandHandler('start', start))
+    application.add_handler(CommandHandler('register', register))
+    application.add_handler(CommandHandler('clean', clean))
     application.add_handler(CommandHandler('members', members))
     application.add_handler(CommandHandler('stats', statistics))
     application.add_handler(CallbackQueryHandler(button_pressed))
