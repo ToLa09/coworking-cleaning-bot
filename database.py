@@ -164,10 +164,10 @@ def complete_cleaning(cleaning_id: int):
         end_date = date.fromisoformat(cleaning["end_date"])
 
         new_start_date = start_date + timedelta(
-            weeks=CLEANING_INTERVAL_WEEKS
+            weeks=int(CLEANING_INTERVAL_WEEKS)
         )
         new_end_date = end_date + timedelta(
-            weeks=CLEANING_INTERVAL_WEEKS
+            weeks=int(CLEANING_INTERVAL_WEEKS)
         )
         cursor = connection.execute(
             """
