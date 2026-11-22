@@ -1,10 +1,8 @@
-from concurrent.interpreters import get_current
 from datetime import date, time
 from zoneinfo import ZoneInfo
 
-from pyexpat.errors import messages
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, CallbackContext, \
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, \
     ConversationHandler, MessageHandler, filters
 
 from cleaning import get_or_create_current_cleaning, shift_cleaning, build_cleaning_message, build_cleaning_keyboard
