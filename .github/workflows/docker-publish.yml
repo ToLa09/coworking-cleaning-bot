@@ -33,7 +33,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: DEIN_DOCKERHUB_NAME/coworking-cleaning-bot
+          images: tola09/coworking-cleaning-bot
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
